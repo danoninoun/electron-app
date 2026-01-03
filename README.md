@@ -3,7 +3,6 @@
 ![Electron](https://img.shields.io/badge/Electron-Desktop-blue?logo=electron)
 ![Status](https://img.shields.io/badge/Status-Active-success)
 ![Version](https://img.shields.io/badge/Version-6.2-purple)
-![Author](https://img.shields.io/badge/Author-Daniel%20Gaspar-orange)
 
 Aplicación de escritorio nativa para la gestión y visualización de datos Pokémon, portada desde web a escritorio utilizando **Electron**. Este proyecto integra la [PokéAPI](https://pokeapi.co/) en una interfaz moderna "Cyberpunk/Glassmorphism" optimizada para el rendimiento.
 

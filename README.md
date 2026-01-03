@@ -45,3 +45,13 @@ Instrucciones para desplegar el proyecto en un entorno local:
 ```bash
 git clone [https://github.com/tu-usuario/electron-pokevisor.git](https://github.com/tu-usuario/electron-pokevisor.git)
 cd electron-pokevisor
+
+### 3. Instalación de Dependencias
+El proyecto utiliza electron como dependencia de desarrollo.
+```bash
+npm install
+
+### 4. Ejecución (Entorno de Desarrollo)
+Para lanzar la aplicación de escritorio:
+```bash
+npm start

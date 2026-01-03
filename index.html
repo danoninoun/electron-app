@@ -1,11 +1,561 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>App en Electron</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PokéVisor 6.2 - Dark Fix</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* --- ESTILOS (IGUAL QUE LA V6.1) --- */
+        :root {
+            --primary: #00d2ff; --secondary: #3a7bd5; --mega: #a06cd5; --giga: #ff4757;
+            --dark-bg: rgba(12, 16, 20, 0.95); --border: rgba(255, 255, 255, 0.15);
+            --glass: rgba(255, 255, 255, 0.05); --text-main: #e0e6ed;
+            --dmg-x4: #ff0040; --dmg-x2: #ff8800; --dmg-x05: #4caf50; --dmg-x025: #00e676; --dmg-x0: #777;
+        }
+        body {
+            font-family: 'Rajdhani', sans-serif; background-color: #050505; color: var(--text-main);
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            min-height: 100vh; margin: 0; overflow-x: hidden;
+            background-image: radial-gradient(circle at 50% 50%, #1a2a3a 0%, #000 90%);
+        }
+        .grid-lines {
+            position: fixed; width: 200%; height: 200%; top: -50%; left: -50%;
+            background-image: linear-gradient(rgba(0, 210, 255, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0, 210, 255, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px; transform: perspective(500px) rotateX(60deg);
+            animation: gridMove 30s linear infinite; z-index: -1; pointer-events: none;
+        }
+        @keyframes gridMove { 100% { transform: perspective(500px) rotateX(60deg) translateY(60px); } }
+
+        /* Buscador */
+        .search-container { position: relative; width: 100%; max-width: 600px; margin-bottom: 30px; z-index: 100; }
+        .search-input {
+            width: 100%; padding: 15px 25px; border-radius: 50px; border: 1px solid var(--primary);
+            background: rgba(0,0,0,0.8); color: #fff; font-family: 'Orbitron'; font-size: 1.1rem;
+            text-align: center; outline: none; box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); transition: 0.3s;
+        }
+        .search-input:focus { box-shadow: 0 0 30px rgba(0, 210, 255, 0.4); border-color: #fff; }
+        .search-suggestions {
+            position: absolute; top: 120%; left: 0; right: 0; background: #0f0f0f; border: 1px solid #333;
+            border-radius: 15px; max-height: 300px; overflow-y: auto; display: none; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+        .suggestion-item {
+            padding: 12px 20px; cursor: pointer; border-bottom: 1px solid #222; text-transform: capitalize;
+            font-size: 1rem; display: flex; align-items: center; justify-content: space-between;
+        }
+        .suggestion-item:hover { background: var(--secondary); color: #fff; }
+
+        /* Dashboard */
+        .dashboard {
+            width: 950px; height: 600px; background: var(--dark-bg); border: 1px solid var(--border);
+            border-radius: 20px; display: grid; grid-template-columns: 400px 1fr;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); backdrop-filter: blur(20px); position: relative; overflow: hidden;
+        }
+        .visual-col {
+            position: relative; background: radial-gradient(circle at center, rgba(255,255,255,0.05) 0%, transparent 80%);
+            border-right: 1px solid var(--border); display: flex; flex-direction: column;
+            justify-content: center; align-items: center; padding: 20px;
+        }
+        .variant-dropdown {
+            width: 80%; padding: 10px; margin-bottom: 10px; background: rgba(0,0,0,0.7);
+            border: 1px solid var(--primary); color: var(--primary); font-family: 'Orbitron';
+            border-radius: 10px; outline: none; cursor: pointer; text-transform: uppercase;
+            font-weight: bold; display: none;
+        }
+        .variant-dropdown option { background: #111; color: #fff; padding: 10px; }
+        .audio-btn {
+            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(0,0,0,0.5); border: 1px solid var(--primary); color: var(--primary);
+            font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: 0.3s; z-index: 20;
+        }
+        .audio-btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 15px var(--primary); }
+        .poke-img-lg {
+            width: 320px; height: 320px; object-fit: contain; filter: drop-shadow(0 20px 30px rgba(0,0,0,0.6));
+            z-index: 10; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .view-controls {
+            position: absolute; bottom: 20px; display: flex; gap: 8px; background: rgba(0,0,0,0.5);
+            padding: 8px 15px; border-radius: 30px; border: 1px solid #333;
+        }
+        .view-btn {
+            background: transparent; border: none; color: #777; font-family: 'Orbitron'; font-weight: bold;
+            cursor: pointer; padding: 5px 10px; border-radius: 15px; transition: 0.3s;
+        }
+        .view-btn.active { background: var(--primary); color: #000; box-shadow: 0 0 10px var(--primary); }
+
+        /* Data Col */
+        .data-col { display: flex; flex-direction: column; overflow: hidden; }
+        .data-header {
+            padding: 20px 25px; border-bottom: 1px solid var(--border); display: flex;
+            justify-content: space-between; align-items: flex-end; background: rgba(255,255,255,0.02);
+        }
+        .main-name { font-size: 2.5rem; margin: 0; font-family: 'Orbitron'; text-transform: capitalize; line-height: 1; }
+        .main-id { color: var(--primary); font-size: 1.5rem; font-family: 'Orbitron'; font-weight: bold; }
+        .type-badges { display: flex; gap: 5px; margin-top: 10px; }
+        .type-pill {
+            padding: 4px 12px; border-radius: 4px; font-weight: bold; font-size: 0.8rem;
+            text-transform: uppercase; text-shadow: 1px 1px 0 rgba(0,0,0,0.5);
+        }
+        .nav-tabs { display: flex; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--border); }
+        .tab-btn {
+            flex: 1; padding: 15px; border: none; background: transparent; color: #888;
+            font-family: 'Orbitron'; font-size: 0.9rem; cursor: pointer; transition: 0.3s;
+            border-bottom: 3px solid transparent;
+        }
+        .tab-btn.active { color: #fff; border-bottom-color: var(--primary); background: rgba(0, 210, 255, 0.05); }
+        .content-scroll { padding: 25px; overflow-y: auto; height: 100%; }
+        .tab-panel { display: none; animation: fadeIn 0.3s; }
+        .tab-panel.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Stats & Bio */
+        .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 25px; }
+        .stat-box {
+            background: var(--glass); padding: 10px; border-radius: 10px; text-align: center;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .sb-label { font-size: 0.7rem; color: #aaa; text-transform: uppercase; margin-bottom: 5px; }
+        .sb-val { font-size: 1.1rem; font-weight: bold; color: #fff; text-transform: capitalize;}
+        
+        .evo-wrapper { display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; align-items: center; }
+        .evo-card { display: flex; flex-direction: column; align-items: center; width: 90px; cursor: pointer; transition: 0.3s; }
+        .evo-card:hover { transform: translateY(-5px); }
+        .evo-card.active img { filter: drop-shadow(0 0 10px var(--primary)); border-color: var(--primary); }
+        .evo-img-wrap {
+            width: 70px; height: 70px; background: rgba(255,255,255,0.05); border-radius: 50%;
+            display: flex; justify-content: center; align-items: center; border: 2px solid transparent; margin-bottom: 5px;
+        }
+        .evo-card img { width: 55px; height: 55px; object-fit: contain; }
+        .trigger-text {
+            font-size: 0.65rem; color: var(--primary); background: rgba(0,0,0,0.5); padding: 2px 4px;
+            border-radius: 4px; margin-top: 5px; max-width: 100%; word-wrap: break-word; text-align: center;
+        }
+        
+        h3 { color: var(--primary); font-family: 'Orbitron'; margin-top: 0; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        .stat-line { display: flex; align-items: center; margin-bottom: 8px; font-size: 0.9rem; }
+        .sl-name { width: 50px; color: #888; font-weight: bold; }
+        .sl-track { flex-grow: 1; height: 8px; background: #222; border-radius: 4px; margin: 0 10px; overflow: hidden; }
+        .sl-fill { height: 100%; border-radius: 4px; }
+        .sl-num { width: 30px; text-align: right; font-weight: bold; }
+
+        .dmg-table { display: flex; flex-direction: column; gap: 10px; }
+        .dmg-row { display: flex; align-items: flex-start; background: rgba(255,255,255,0.03); border-radius: 8px; padding: 8px; }
+        .dmg-label {
+            width: 120px; font-size: 0.8rem; text-transform: uppercase; font-weight: bold;
+            padding-right: 10px; border-right: 1px solid rgba(255,255,255,0.1); margin-right: 10px;
+            display: flex; align-items: center; height: 100%;
+        }
+        .dmg-list { flex: 1; display: flex; flex-wrap: wrap; gap: 5px; }
+        .dmg-tag { padding: 3px 8px; border-radius: 4px; font-size: 0.75rem; color: #fff; text-shadow: 1px 1px 0 rgba(0,0,0,0.5); }
+
+        .nav-arrow {
+            position: absolute; top: 50%; width: 60px; height: 60px; background: rgba(0,0,0,0.5);
+            color: #fff; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; cursor: pointer; transition: 0.3s; border: 1px solid var(--primary);
+            backdrop-filter: blur(5px); z-index: 50; transform: translateY(-50%);
+        }
+        .nav-arrow:hover { background: var(--primary); color: #000; box-shadow: 0 0 20px var(--primary); }
+        .nav-left { left: calc(50% - 540px); }
+        .nav-right { right: calc(50% - 540px); }
+        #loader { position: absolute; inset: 0; background: #000; z-index: 200; display: flex; justify-content: center; align-items: center; }
+        .ring { width: 60px; height: 60px; border: 5px solid #333; border-top-color: var(--primary); border-radius: 50%; animation: spin 1s infinite linear; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
-    <h1>¡Hola Mundo desde Electron!</h1>
-    <p>Esta aplicación está corriendo usando tecnologías web.</p>
+    <div class="grid-lines"></div>
+
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="Buscar Pokémon..." autocomplete="off">
+        <div class="search-suggestions" id="suggestions"></div>
+    </div>
+
+    <div class="nav-arrow nav-left" onclick="nav(-1)"><i class="fas fa-chevron-left"></i></div>
+    <div class="nav-arrow nav-right" onclick="nav(1)"><i class="fas fa-chevron-right"></i></div>
+
+    <div class="dashboard" id="dashboard">
+        <div id="loader"><div class="ring"></div></div>
+
+        <div class="visual-col">
+            <select id="variantSelect" class="variant-dropdown" onchange="fetchPokemon(this.value)"></select>
+            <button class="audio-btn" onclick="playCry()">🔊</button>
+
+            <img id="pokeImg" class="poke-img-lg" src="" alt="Pokemon">
+
+            <div class="view-controls">
+                <button class="view-btn active" id="modeArt" onclick="setMode('art')">ART</button>
+                <button class="view-btn" id="modeHome" onclick="setMode('home')">HOME</button>
+                <button class="view-btn" id="mode3d" onclick="setMode('3d')">3D</button>
+                <button class="view-btn" id="modePx" onclick="setMode('px')">PX</button>
+                <div style="width:1px; background:#444; margin:0 5px;"></div>
+                <button class="view-btn" id="btnShiny" onclick="toggleShiny()" style="color:var(--primary)">✨</button>
+            </div>
+        </div>
+
+        <div class="data-col">
+            <div class="data-header">
+                <div>
+                    <h1 class="main-name" id="name">Cargando...</h1>
+                    <div class="type-badges" id="typesBox"></div>
+                </div>
+                <div class="main-id" id="displayId">#---</div>
+            </div>
+
+            <div class="nav-tabs">
+                <button class="tab-btn active" onclick="setTab('bio', this)">BIO & EVOLUCIÓN</button>
+                <button class="tab-btn" onclick="setTab('stats', this)">ESTADÍSTICAS</button>
+                <button class="tab-btn" onclick="setTab('moves', this)">COMBATE</button>
+            </div>
+
+            <div class="content-scroll">
+                <div id="tab-bio" class="tab-panel active">
+                    <p id="flavorText" style="font-style: italic; color: #ccc; margin-bottom: 20px; line-height: 1.6; border-left: 3px solid var(--primary); padding-left: 15px;"></p>
+                    
+                    <div class="stats-grid">
+                        <div class="stat-box"><div class="sb-label">Altura</div><div class="sb-val" id="height">--</div></div>
+                        <div class="stat-box"><div class="sb-label">Peso</div><div class="sb-val" id="weight">--</div></div>
+                        <div class="stat-box"><div class="sb-label">Categoría</div><div class="sb-val" id="genera" style="font-size:0.9rem">--</div></div>
+                        <div class="stat-box"><div class="sb-label">Hábitat</div><div class="sb-val" id="habitat" style="font-size:0.9rem">--</div></div>
+                    </div>
+
+                    <h3>Cadena Evolutiva</h3>
+                    <div class="evo-wrapper" id="evoChainBox"></div>
+                </div>
+
+                <div id="tab-stats" class="tab-panel">
+                    <h3>Stats Base</h3>
+                    <div id="statsBox"></div>
+                    <h3 style="margin-top:25px">Efectividad de Tipos (Defensivo)</h3>
+                    <div class="dmg-table" id="dmgTable"></div>
+                </div>
+
+                <div id="tab-moves" class="tab-panel">
+                    <h3>Habilidades</h3>
+                    <div id="abilitiesBox"></div>
+                    <h3 style="margin-top:20px">Movimientos Destacados</h3>
+                    <div id="movesBox"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DICCIONARIOS ---
+        const typeColors = { 
+            normal: '#A8A77A', fire: '#EE8130', water: '#6390F0', electric: '#F7D02C', 
+            grass: '#7AC74C', ice: '#96D9D6', fighting: '#C22E28', poison: '#A33EA1', 
+            ground: '#E2BF65', flying: '#A98FF3', psychic: '#F95587', bug: '#A6B91A', 
+            rock: '#B6A136', ghost: '#735797', dragon: '#6F35FC', steel: '#B7B7CE', 
+            fairy: '#D685AD', dark: '#705746' // AÑADIDO: Tipo Siniestro
+        };
+        const typeTrans = { 
+            normal: 'Normal', fire: 'Fuego', water: 'Agua', electric: 'Eléctrico', 
+            grass: 'Planta', ice: 'Hielo', fighting: 'Lucha', poison: 'Veneno', 
+            ground: 'Tierra', flying: 'Volador', psychic: 'Psíquico', bug: 'Bicho', 
+            rock: 'Roca', ghost: 'Fantasma', dragon: 'Dragón', steel: 'Acero', 
+            fairy: 'Hada', dark: 'Siniestro' // AÑADIDO: Traducción Siniestro
+        };
+        const statTrans = {'hp':'PS', 'attack':'Ataque', 'defense':'Defensa', 'special-attack':'At. Esp', 'special-defense':'Df. Esp', 'speed':'Velocidad'};
+        const evoTrans = { 'level-up': 'Nivel', 'trade': 'Intercambio', 'use-item': 'Objeto', 'shed': 'Mudar piel', 'spin': 'Girar', 'tower-of-darkness': 'Torre Oscura', 'tower-of-waters': 'Torre Agua', 'three-critical-hits': '3 Críticos', 'take-damage': 'Recibir daño', 'other': 'Especial' };
+        const itemTrans = { 'water-stone': 'Piedra Agua', 'thunder-stone': 'Piedra Trueno', 'leaf-stone': 'Piedra Hoja', 'fire-stone': 'Piedra Fuego', 'moon-stone': 'Piedra Luna', 'sun-stone': 'Piedra Solar', 'shiny-stone': 'Piedra Día', 'dusk-stone': 'Piedra Noche', 'dawn-stone': 'Piedra Alba', 'ice-stone': 'Piedra Hielo', 'kings-rock': 'Roca del Rey', 'metal-coat': 'Revest. Metálico', 'dragon-scale': 'Escama Dragón', 'up-grade': 'Mejora', 'dubious-disc': 'Disco Extraño', 'protector': 'Protector', 'electirizer': 'Electrizador', 'magmarizer': 'Magmatizador', 'reaper-cloth': 'Tela Terrible', 'prism-scale': 'Escama Bella', 'oval-stone': 'Piedra Oval', 'razor-claw': 'Garra Afilada', 'razor-fang': 'Colmillo Agudo', 'galarica-cuff': 'Brazal Galanuez', 'galarica-wreath': 'Corona Galanuez' };
+
+        let state = {
+            currentId: 635, // Hydreigon para probar (Siniestro/Dragon)
+            data: null, species: null, mode: 'art', shiny: false, searchList: []
+        };
+
+        window.onload = async () => {
+            await loadSearchList();
+            setupSearch();
+            fetchPokemon(state.currentId);
+        };
+
+        async function fetchPokemon(query) {
+            document.getElementById('loader').style.display = 'flex';
+            try {
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${query}`);
+                if(!res.ok) throw new Error();
+                const data = await res.json();
+                state.data = data;
+                if(data.id < 10000) state.currentId = data.id; 
+
+                const specRes = await fetch(data.species.url);
+                const species = await specRes.json();
+                state.species = species;
+
+                renderBasicInfo();
+                renderStats();
+                renderImages();
+                renderVariantsSelector(species); 
+
+                const evoRes = await fetch(species.evolution_chain.url);
+                const evoData = await evoRes.json();
+                renderEvolutionTree(evoData.chain, data.name); 
+
+                calcWeaknessDetailed(data.types);
+                
+                const abP = fetchAbilitiesES(data.abilities);
+                const mvP = fetchMovesES(data.moves);
+                const [abs, mvs] = await Promise.all([abP, mvP]);
+                renderAbilities(abs);
+                renderMoves(mvs);
+
+                playCry(0.2); 
+
+            } catch (e) {
+                console.error(e);
+                alert("Error cargando Pokémon");
+            } finally {
+                document.getElementById('loader').style.display = 'none';
+            }
+        }
+
+        function renderBasicInfo() {
+            const d = state.data; const s = state.species;
+            document.getElementById('name').innerText = d.name.replace(/-/g, ' ');
+            document.getElementById('displayId').innerText = `#${s.id.toString().padStart(3,'0')}`;
+            
+            const tBox = document.getElementById('typesBox'); tBox.innerHTML = '';
+            d.types.forEach(t => {
+                const sp = document.createElement('span'); sp.className = 'type-pill';
+                // Añadido chequeo de seguridad
+                const typeName = typeTrans[t.type.name] || t.type.name;
+                const typeColor = typeColors[t.type.name] || '#777';
+                
+                sp.innerText = typeName; sp.style.background = typeColor;
+                tBox.appendChild(sp);
+            });
+
+            const entry = s.flavor_text_entries.find(e => e.language.name === 'es') || s.flavor_text_entries.find(e => e.language.name === 'en');
+            document.getElementById('flavorText').innerText = entry ? entry.flavor_text.replace(/\f/g, ' ') : "Sin descripción.";
+            document.getElementById('height').innerText = d.height/10 + " m";
+            document.getElementById('weight').innerText = d.weight/10 + " kg";
+            const gen = s.genera.find(g => g.language.name === 'es') || s.genera.find(g => g.language.name === 'en');
+            document.getElementById('genera').innerText = gen ? gen.genus : "???";
+            document.getElementById('habitat').innerText = s.habitat ? capitalize(s.habitat.name) : "Desconocido";
+        }
+
+        function renderImages() {
+            const img = document.getElementById('pokeImg');
+            const { data, mode, shiny } = state; let src = '';
+            document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`mode${capitalize(mode)}`).classList.add('active');
+
+            if (mode === 'art') src = shiny ? data.sprites.other['official-artwork'].front_shiny : data.sprites.other['official-artwork'].front_default;
+            else if (mode === 'home') src = shiny ? data.sprites.other.home.front_shiny : data.sprites.other.home.front_default;
+            else if (mode === '3d') { const show = data.sprites.other.showdown; src = shiny ? show.front_shiny : show.front_default; if(!src) src = data.sprites.other.home.front_default; } 
+            else if (mode === 'px') { const px = data.sprites.versions['generation-v']['black-white'].animated; src = shiny ? px.front_shiny : px.front_default; if(!src) src = data.sprites.front_default; img.style.imageRendering = 'pixelated'; }
+            if(mode !== 'px') img.style.imageRendering = 'auto';
+            img.src = src || data.sprites.other['official-artwork'].front_default;
+        }
+
+        function renderVariantsSelector(species) {
+            const sel = document.getElementById('variantSelect');
+            const vars = species.varieties.filter(v => !v.pokemon.name.includes('-totem'));
+            if(vars.length <= 1) { sel.style.display = 'none'; return; }
+            sel.style.display = 'block'; sel.innerHTML = '';
+            vars.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v.pokemon.name;
+                let label = v.pokemon.name.replace(species.name, '').replace(/-/g, ' ').trim();
+                if(label === '') label = 'Base';
+                opt.innerText = capitalize(label);
+                if(v.pokemon.name === state.data.name) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        function playCry(vol=1) {
+             if(state.data.cries && state.data.cries.latest) {
+                 const a = new Audio(state.data.cries.latest); a.volume = vol; a.play().catch(e=>console.log("Auto-play blocked"));
+             }
+        }
+
+        function renderEvolutionTree(chain, currentName) {
+            const container = document.getElementById('evoChainBox');
+            container.innerHTML = '';
+            
+            let regionSuffix = "";
+            const regions = ["alola", "galar", "hisui", "paldea"];
+            regions.forEach(r => { if(currentName.includes(r)) regionSuffix = `-${r}`; });
+
+            if(chain.evolves_to.length > 2) {
+                container.appendChild(createSmartEvoCard(chain.species, "Base", regionSuffix));
+                const arrow = document.createElement('div');
+                arrow.innerHTML = '<i class="fas fa-chevron-right" style="color:#555; font-size:1.5rem; margin:0 15px;"></i>';
+                container.appendChild(arrow);
+                const branches = document.createElement('div');
+                branches.style.display = 'flex'; branches.style.flexWrap = 'wrap'; branches.style.gap = '15px'; branches.style.maxWidth = '300px';
+                chain.evolves_to.forEach(child => {
+                   branches.appendChild(createSmartEvoCard(child.species, translateEvolution(child.evolution_details[0]), regionSuffix));
+                });
+                container.appendChild(branches);
+            } else {
+                let current = chain;
+                while(current) {
+                    let trigger = "Base";
+                    if(current.evolution_details.length > 0) trigger = translateEvolution(current.evolution_details[0]);
+                    
+                    container.appendChild(createSmartEvoCard(current.species, trigger, regionSuffix));
+
+                    if(current.evolves_to.length > 0) {
+                        const arrow = document.createElement('div');
+                        arrow.innerHTML = '<i class="fas fa-chevron-right" style="color:#555; margin:0 5px;"></i>';
+                        container.appendChild(arrow);
+                        if(current.evolves_to.length > 1) { 
+                            const branchCont = document.createElement('div');
+                            branchCont.style.display='flex'; branchCont.style.flexDirection='column'; branchCont.style.gap='10px';
+                            current.evolves_to.forEach(b => {
+                                branchCont.appendChild(createSmartEvoCard(b.species, translateEvolution(b.evolution_details[0]), regionSuffix));
+                            });
+                            container.appendChild(branchCont);
+                            break;
+                        }
+                        current = current.evolves_to[0];
+                    } else { current = null; }
+                }
+            }
+        }
+
+        function createSmartEvoCard(species, triggerText, regionSuffix) {
+            const div = document.createElement('div');
+            let targetName = species.name;
+            if(regionSuffix) targetName += regionSuffix;
+
+            const isActive = targetName === state.data.name || species.name === state.data.name;
+            div.className = `evo-card ${isActive ? 'active' : ''}`;
+            div.onclick = () => fetchPokemon(targetName); 
+
+            const baseId = species.url.split('/').slice(-2,-1)[0];
+            const baseUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${baseId}.png`;
+            
+            div.innerHTML = `
+                <div class="evo-img-wrap">
+                    <img src="${baseUrl}" alt="${species.name}">
+                </div>
+                <span style="font-size:0.75rem; font-weight:bold; text-transform:capitalize;">${targetName.replace(/-/g, ' ')}</span>
+                <span class="trigger-text">${triggerText}</span>
+            `;
+            return div;
+        }
+
+        function translateEvolution(details) {
+            if(!details) return "Base";
+            if(details.trigger.name === 'level-up') {
+                if(details.min_level) return `Nivel ${details.min_level}`;
+                if(details.min_happiness) return `Felicidad`;
+                if(details.known_move) return `Mov: ${translateName(details.known_move.name)}`;
+                if(details.location) return `En ${formatName(details.location.name)}`;
+                if(details.item) return `Objeto ${itemTrans[details.item.name]||details.item.name}`; 
+                return "Subir Nivel";
+            }
+            if(details.trigger.name === 'use-item') return itemTrans[details.item.name] || formatName(details.item.name);
+            if(details.trigger.name === 'trade') return details.held_item ? `Intercambio (${itemTrans[details.held_item.name] || 'Obj'})` : "Intercambio";
+            return evoTrans[details.trigger.name] || details.trigger.name;
+        }
+
+        function renderStats() {
+            const box = document.getElementById('statsBox'); box.innerHTML = '';
+            const color = typeColors[state.data.types[0].type.name];
+            state.data.stats.forEach(s => {
+                const pct = (s.base_stat/200)*100;
+                box.innerHTML += `<div class="stat-line"><div class="sl-name">${statTrans[s.stat.name]}</div><div class="sl-track"><div class="sl-fill" style="width:${pct}%; background:${color}; box-shadow:0 0 10px ${color}"></div></div><div class="sl-num">${s.base_stat}</div></div>`;
+            });
+        }
+        async function calcWeaknessDetailed(types) {
+            let map = {}; Object.keys(typeTrans).forEach(k => map[k] = 1);
+            for(const t of types) {
+                const r = await fetch(t.type.url).then(res => res.json());
+                r.damage_relations.double_damage_from.forEach(x => map[x.name] *= 2);
+                r.damage_relations.half_damage_from.forEach(x => map[x.name] *= 0.5);
+                r.damage_relations.no_damage_from.forEach(x => map[x.name] *= 0);
+            }
+            const buckets = { 4: [], 2: [], 0.5: [], 0.25: [], 0: [] };
+            Object.entries(map).forEach(([key, val]) => { if (buckets[val]) buckets[val].push(key); });
+            const table = document.getElementById('dmgTable'); table.innerHTML = '';
+            renderDamageRow(table, "Hipereficaz", "x4", buckets[4], "var(--dmg-x4)");
+            renderDamageRow(table, "Supereficaz", "x2", buckets[2], "var(--dmg-x2)");
+            renderDamageRow(table, "Poco eficaz", "x0.5", buckets[0.5], "var(--dmg-x05)");
+            renderDamageRow(table, "Muy poco", "x0.25", buckets[0.25], "var(--dmg-x025)");
+            renderDamageRow(table, "Inmune", "x0", buckets[0], "var(--dmg-x0)");
+        }
+        function renderDamageRow(container, label, mult, types, color) {
+            if (types.length === 0) return;
+            const row = document.createElement('div'); row.className = 'dmg-row';
+            const lbl = document.createElement('div'); lbl.className = 'dmg-label'; lbl.style.color = color;
+            lbl.innerHTML = `${label} <span style="font-size:0.7rem; opacity:0.7; margin-left:5px;">(${mult})</span>`;
+            const list = document.createElement('div'); list.className = 'dmg-list';
+            types.forEach(t => {
+                const tag = document.createElement('span'); tag.className = 'dmg-tag';
+                // Chequeo de seguridad para evitar undefined en daños
+                const typeName = typeTrans[t] || t;
+                const typeColor = typeColors[t] || '#777';
+                
+                tag.style.backgroundColor = typeColor; 
+                tag.innerText = typeName; 
+                list.appendChild(tag);
+            });
+            row.appendChild(lbl); row.appendChild(list); container.appendChild(row);
+        }
+
+        async function fetchAbilitiesES(abs) {
+            return Promise.all(abs.map(async a => {
+                const r = await fetch(a.ability.url).then(res=>res.json());
+                return { name: r.names.find(n=>n.language.name==='es')?.name || a.ability.name, desc: r.flavor_text_entries.find(f=>f.language.name==='es')?.flavor_text || "...", hidden: a.is_hidden };
+            }));
+        }
+        function renderAbilities(list) {
+            const box=document.getElementById('abilitiesBox'); box.innerHTML='';
+            list.forEach(a=>{
+                box.innerHTML+=`<div style="background:rgba(255,255,255,0.05); padding:8px; margin-bottom:5px; border-radius:5px; border-left:3px solid ${a.hidden?'var(--secondary)':'var(--primary)'}"><div style="font-weight:bold;">${a.name} ${a.hidden?'<small>(Oculta)</small>':''}</div><div style="font-size:0.8rem; color:#aaa;">${a.desc}</div></div>`;
+            });
+        }
+        async function fetchMovesES(moves) {
+             const levelMoves = moves.filter(m => m.version_group_details.some(d => d.move_learn_method.name === 'level-up'));
+             const top = levelMoves.slice(-5).reverse();
+             return Promise.all(top.map(async m => {
+                 const r = await fetch(m.move.url).then(res => res.json());
+                 return { name: r.names.find(n => n.language.name === 'es')?.name || m.move.name, type: r.type.name, lvl: m.version_group_details[0].level_learned_at };
+             }));
+        }
+        function renderMoves(list) {
+            const box=document.getElementById('movesBox'); box.innerHTML='';
+            list.forEach(m=>{
+                // Chequeo de seguridad para tipos en moves
+                const typeName = typeTrans[m.type] || m.type;
+                const typeColor = typeColors[m.type] || '#777';
+                
+                box.innerHTML+=`<div style="display:flex; justify-content:space-between; padding:5px; border-bottom:1px solid #333; font-size:0.9rem;"><div>${m.name} <small style="color:#888">Nv ${m.lvl}</small></div><span style="color:${typeColor}">${typeName}</span></div>`;
+            });
+        }
+        async function loadSearchList() {
+            const r = await fetch('https://pokeapi.co/api/v2/pokemon?limit=1000');
+            const d = await r.json();
+            state.searchList = d.results;
+        }
+        function setupSearch() {
+            const i=document.getElementById('searchInput'), s=document.getElementById('suggestions');
+            i.addEventListener('input', e=>{
+                const v=e.target.value.toLowerCase(); s.innerHTML='';
+                if(v.length<2){s.style.display='none';return;}
+                const m=state.searchList.filter(p=>p.name.includes(v)).slice(0,8);
+                if(m.length){s.style.display='block'; m.forEach(x=>{
+                    const d=document.createElement('div'); d.className='suggestion-item'; d.innerText=x.name;
+                    d.onclick=()=>{i.value='';s.style.display='none';fetchPokemon(x.name)}; s.appendChild(d);
+                })} else s.style.display='none';
+            });
+        }
+
+        function setMode(m){state.mode=m;renderImages();}
+        function toggleShiny(){state.shiny=!state.shiny;renderImages();document.getElementById('btnShiny').classList.toggle('active');}
+        function setTab(n,b){document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.tab-btn').forEach(x=>x.classList.remove('active'));document.getElementById(`tab-${n}`).classList.add('active');b.classList.add('active');}
+        function nav(d){fetchPokemon(state.currentId+d);}
+        function capitalize(s){return s.charAt(0).toUpperCase()+s.slice(1);}
+        function formatName(s){return capitalize(s.replace(/-/g,' '));}
+        function translateName(name) { return capitalize(name.replace(/-/g, ' ')); }
+    </script>
 </body>
 </html>

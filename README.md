@@ -43,7 +43,7 @@ Instrucciones para desplegar el proyecto en un entorno local:
 
 ### 2. Clonación del Repositorio
 ```bash
-git clone [https://github.com/tu-usuario/electron-pokevisor.git](https://github.com/tu-usuario/electron-pokevisor.git)
+git clone https://github.com/danoninoun/electron-pokevisor.git
 cd electron-pokevisor
 ```
 
